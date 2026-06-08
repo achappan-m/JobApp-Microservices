@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,7 +40,9 @@ class CompanyServiceImplTest {
 
     @BeforeEach
     void attachLogAppender() {
+        // Logback-specific: works because spring-boot-starter-test includes logback-classic
         Logger logger = (Logger) LoggerFactory.getLogger(CompanyServiceImpl.class);
+        logger.setLevel(Level.WARN);
         logAppender = new ListAppender<>();
         logAppender.start();
         logger.addAppender(logAppender);
@@ -58,12 +59,23 @@ class CompanyServiceImplTest {
     void updateRatingOnCreate_missingCompany_logsWarnAndAcks() {
         when(companyRepository.updateRatingAtomically(42L, 4.5, 1)).thenReturn(0);
 
-        assertDoesNotThrow(() ->
-            companyService.updateCompanyRatingOnCreate(new ReviewCreatedEvent(1L, 4.5, 42L)));
+        companyService.updateCompanyRatingOnCreate(new ReviewCreatedEvent(1L, 4.5, 42L));
 
         assertThat(logAppender.list)
             .anyMatch(e -> e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("42"));
+                        && e.getFormattedMessage().contains("42")
+                        && e.getFormattedMessage().contains("not found"));
+    }
+
+    @Test
+    void updateRatingOnCreate_existingCompany_doesNotLogWarn() {
+        when(companyRepository.updateRatingAtomically(42L, 4.5, 1)).thenReturn(1);
+
+        companyService.updateCompanyRatingOnCreate(new ReviewCreatedEvent(1L, 4.5, 42L));
+
+        assertThat(logAppender.list)
+            .noneMatch(e -> e.getLevel() == Level.WARN
+                         && e.getFormattedMessage().contains("42"));
     }
 
     // ── review.updated ─────────────────────────────────────────────────────────
@@ -73,12 +85,23 @@ class CompanyServiceImplTest {
         // oldRating=3.0, newRating=4.0 → deltaSum passed to repo = 4.0 - 3.0 = 1.0
         when(companyRepository.updateRatingAtomically(42L, 1.0, 0)).thenReturn(0);
 
-        assertDoesNotThrow(() ->
-            companyService.updateCompanyRatingOnUpdate(new ReviewUpdatedEvent(1L, 3.0, 4.0, 42L)));
+        companyService.updateCompanyRatingOnUpdate(new ReviewUpdatedEvent(1L, 3.0, 4.0, 42L));
 
         assertThat(logAppender.list)
             .anyMatch(e -> e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("42"));
+                        && e.getFormattedMessage().contains("42")
+                        && e.getFormattedMessage().contains("not found"));
+    }
+
+    @Test
+    void updateRatingOnUpdate_existingCompany_doesNotLogWarn() {
+        when(companyRepository.updateRatingAtomically(42L, 1.0, 0)).thenReturn(1);
+
+        companyService.updateCompanyRatingOnUpdate(new ReviewUpdatedEvent(1L, 3.0, 4.0, 42L));
+
+        assertThat(logAppender.list)
+            .noneMatch(e -> e.getLevel() == Level.WARN
+                         && e.getFormattedMessage().contains("42"));
     }
 
     // ── review.deleted ─────────────────────────────────────────────────────────
@@ -87,11 +110,22 @@ class CompanyServiceImplTest {
     void updateRatingOnDelete_missingCompany_logsWarnAndAcks() {
         when(companyRepository.updateRatingAtomically(42L, -4.5, -1)).thenReturn(0);
 
-        assertDoesNotThrow(() ->
-            companyService.updateCompanyRatingOnDelete(new ReviewDeletedEvent(1L, 4.5, 42L)));
+        companyService.updateCompanyRatingOnDelete(new ReviewDeletedEvent(1L, 4.5, 42L));
 
         assertThat(logAppender.list)
             .anyMatch(e -> e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("42"));
+                        && e.getFormattedMessage().contains("42")
+                        && e.getFormattedMessage().contains("not found"));
+    }
+
+    @Test
+    void updateRatingOnDelete_existingCompany_doesNotLogWarn() {
+        when(companyRepository.updateRatingAtomically(42L, -4.5, -1)).thenReturn(1);
+
+        companyService.updateCompanyRatingOnDelete(new ReviewDeletedEvent(1L, 4.5, 42L));
+
+        assertThat(logAppender.list)
+            .noneMatch(e -> e.getLevel() == Level.WARN
+                         && e.getFormattedMessage().contains("42"));
     }
 }

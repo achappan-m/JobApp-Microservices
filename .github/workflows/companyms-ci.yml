@@ -1,0 +1,100 @@
+name: companyms CI
+
+on:
+  push:
+    paths:
+      - 'companyms/**'
+      - '.github/workflows/companyms-ci.yml'
+  pull_request:
+    paths:
+      - 'companyms/**'
+      - '.github/workflows/companyms-ci.yml'
+
+jobs:
+  ci:
+    name: Build · Test · Analyse
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: companyms
+
+    steps:
+
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history required by Gitleaks
+
+      # ── 2. Secret scan ───────────────────────────────────────────────────────
+      - name: Secret scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 3. Java toolchain + Maven dependency cache ───────────────────────────
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # ── 4. NVD database cache (avoids re-downloading ~200 MB each run) ───────
+      - name: Cache NVD vulnerability database
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check/data
+          key: nvd-db-${{ runner.os }}
+
+      # ── 5. Wrapper executable bit ────────────────────────────────────────────
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
+
+      # ── 6. Tests + JaCoCo coverage ───────────────────────────────────────────
+      #    SpotBugs is also bound to verify, so skip it here — it gets its own step.
+      - name: Tests + JaCoCo coverage
+        run: ./mvnw clean verify -B -Dspotbugs.skip=true
+
+      # ── 7. SpotBugs — report-only, never fails the build ─────────────────────
+      #    spotbugs:spotbugs generates the XML report; spotbugs:check is not invoked.
+      - name: SpotBugs analysis (report mode)
+        run: ./mvnw spotbugs:spotbugs -B -DskipTests
+
+      # ── 8. OWASP Dependency-Check — fails on CVSS ≥ 8 (configured in pom.xml) ─
+      - name: OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          ./mvnw verify -B -Psecurity-scan \
+            -DnvdApiKey="${NVD_API_KEY}" \
+            -DskipTests \
+            -Djacoco.skip=true \
+            -Dspotbugs.skip=true
+        timeout-minutes: 30
+
+      # ── 9. Upload reports (always, even when a gate above fails) ─────────────
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: companyms/target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload SpotBugs report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotbugs-report
+          path: companyms/target/spotbugsXml.xml
+          retention-days: 14
+
+      - name: Upload OWASP Dependency-Check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: companyms/target/dependency-check-report.html
+          retention-days: 14

@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.companyms.bean.Company;
 import com.companyms.bean.JobSummary;
 import com.companyms.bean.ReviewSummary;
@@ -24,6 +27,8 @@ import jakarta.transaction.Transactional;
 
 @Service
 public class CompanyServiceImpl implements CompanyService {
+
+    private static final Logger logger = LoggerFactory.getLogger(CompanyServiceImpl.class);
 
     private CompanyRepository companyRepository;
     private CompanyMapper companyMapper;
@@ -101,7 +106,10 @@ public class CompanyServiceImpl implements CompanyService {
         // companyEntity.setAverageRating(newAvg);
         // companyEntity.setReviewCount(count + 1);
         // companyRepository.save(companyEntity);
-        companyRepository.updateRatingAtomically(event.getCompanyId(), event.getRating(), 1);
+        int updated = companyRepository.updateRatingAtomically(event.getCompanyId(), event.getRating(), 1);
+        if (updated == 0) {
+            logger.warn("Rating create event ignored: company {} not found (stale event)", event.getCompanyId());
+        }
     }
 
     @Override
@@ -115,7 +123,10 @@ public class CompanyServiceImpl implements CompanyService {
         // double newAvg = (avg * count - event.getOldRating() + event.getNewRating()) / count;
         // companyEntity.setAverageRating(newAvg);
         // companyRepository.save(companyEntity);
-        companyRepository.updateRatingAtomically(event.getCompanyId(), event.getNewRating() - event.getOldRating(), 0);
+        int updated = companyRepository.updateRatingAtomically(event.getCompanyId(), event.getNewRating() - event.getOldRating(), 0);
+        if (updated == 0) {
+            logger.warn("Rating update event ignored: company {} not found (stale event)", event.getCompanyId());
+        }
     }
 
     @Override
@@ -135,7 +146,10 @@ public class CompanyServiceImpl implements CompanyService {
         //     companyEntity.setReviewCount(count - 1);
         // }
         // companyRepository.save(companyEntity);
-        companyRepository.updateRatingAtomically(event.getCompanyId(), -event.getRating(), -1);
+        int updated = companyRepository.updateRatingAtomically(event.getCompanyId(), -event.getRating(), -1);
+        if (updated == 0) {
+            logger.warn("Rating delete event ignored: company {} not found (stale event)", event.getCompanyId());
+        }
     }
     
 }

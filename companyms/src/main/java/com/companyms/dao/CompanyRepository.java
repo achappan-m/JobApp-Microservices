@@ -11,12 +11,13 @@ public interface CompanyRepository extends JpaRepository<CompanyEntity,Long> {
 
     @Modifying
     @Query("""
-        UPDATE CompanyEntity c 
-        SET c.ratingSum = c.ratingSum + :deltaSum, 
-        c.reviewCount = c.reviewCount + :deltaCount, 
-        c.averageRating = CASE WHEN (c.reviewCount + :deltaCount) = 0 THEN 0 
-                          ELSE (c.ratingSum + :deltaSum) / (c.reviewCount + :deltaCount) 
-                     END
+        UPDATE CompanyEntity c
+        SET c.reviewCount   = CASE WHEN (c.reviewCount + :deltaCount) < 0 THEN 0
+                                   ELSE c.reviewCount + :deltaCount END,
+            c.ratingSum     = CASE WHEN (c.ratingSum + :deltaSum) < 0 THEN 0
+                                   ELSE c.ratingSum + :deltaSum END,
+            c.averageRating = CASE WHEN (c.reviewCount + :deltaCount) <= 0 THEN 0
+                              ELSE (c.ratingSum + :deltaSum) / (c.reviewCount + :deltaCount) END
         WHERE c.id = :companyId
     """)
     int updateRatingAtomically(@Param("companyId") Long companyId,

@@ -53,14 +53,20 @@ public class JobClientServiceImpl implements JobClientService {
 
     @Override
     public List<JobSummary> getJobFallback(Long companyId, Throwable throwable) {
-        logger.error("Job service is unavailable. Falling back to empty job list for companyId: {}", companyId, throwable);
+        logger.error("Job service is unavailable. Falling back to empty job list for companyId: {}, cause: {}",
+                companyId, sanitize(throwable.getMessage()));
         return List.of();
     }
 
     @Override
     public void deleteJobFallback(Long companyId, Throwable throwable) {
-        logger.error("Job service is unavailable. Unable to delete jobs for companyId: {}", companyId, throwable);
+        logger.error("Job service is unavailable. Unable to delete jobs for companyId: {}, cause: {}",
+                companyId, sanitize(throwable.getMessage()));
         throw new RuntimeException("Job service is currently unavailable. Please try again later.");
+    }
+
+    private static String sanitize(String s) {
+        return s == null ? "" : s.replace('\r', ' ').replace('\n', ' ');
     }
 
 }

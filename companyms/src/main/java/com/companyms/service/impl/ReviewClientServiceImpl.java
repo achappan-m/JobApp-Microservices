@@ -58,7 +58,12 @@ public class ReviewClientServiceImpl implements ReviewClientService {
 
     @Override
     public void deleteReviewFallback(Long companyId, Throwable throwable) {
-        logger.error("Review service is unavailable. Unable to delete reviews for companyId: {}", companyId, throwable);
+        logger.error("Review service is unavailable. Unable to delete reviews for companyId: {}, cause: {}",
+                companyId, sanitize(throwable.getMessage()));
         throw new RuntimeException("Review service is currently unavailable. Please try again later.");
+    }
+
+    private static String sanitize(String s) {
+        return s == null ? "" : s.replace('\r', ' ').replace('\n', ' ');
     }
 }

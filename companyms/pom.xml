@@ -155,6 +155,9 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>com.companyms.CompanymsApplication</mainClass>
+				</configuration>
 			</plugin>
 
 			<!-- ── 1. JaCoCo coverage ──────────────────────────────────────────── -->
@@ -208,31 +211,7 @@
 				</executions>
 			</plugin>
 
-			<!-- ── 2. OWASP Dependency-Check ──────────────────────────────────── -->
-			<!-- NOTE: First run downloads the NVD vulnerability database (~200 MB).
-			     An NVD API key is strongly recommended to avoid rate-limiting.
-			     Free key: https://nvd.nist.gov/developers/request-an-api-key
-			     Pass via: mvn verify -DnvdApiKey=<your-key>                    -->
-			<plugin>
-				<groupId>org.owasp</groupId>
-				<artifactId>dependency-check-maven</artifactId>
-				<version>${dependency-check-maven.version}</version>
-				<configuration>
-					<!-- Fail only on critical/high vulnerabilities (CVSS >= 8) -->
-					<failBuildOnCVSS>8</failBuildOnCVSS>
-				</configuration>
-				<executions>
-					<execution>
-						<id>dependency-check</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-
-			<!-- ── 3. SpotBugs + FindSecBugs ──────────────────────────────────── -->
+			<!-- ── 2. SpotBugs + FindSecBugs ──────────────────────────────────── -->
 			<!-- failOnError=false for this first run — triage the report before
 			     enforcing. Flip to true once known false positives are suppressed. -->
 			<plugin>
@@ -242,7 +221,8 @@
 				<configuration>
 					<effort>Max</effort>
 					<threshold>Low</threshold>
-					<failOnError>false</failOnError>
+					<failOnError>true</failOnError>
+					<excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
 					<plugins>
 						<plugin>
 							<groupId>com.h3xstream.findsecbugs</groupId>
@@ -264,5 +244,36 @@
 
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<id>security-scan</id>
+			<!-- Run with: mvn verify -Psecurity-scan -DnvdApiKey=<your-key> -->
+			<build>
+				<plugins>
+					<!-- ── OWASP Dependency-Check ─────────────────────────────────── -->
+					<!-- NOTE: First run downloads the NVD vulnerability database (~200 MB).
+					     Free NVD API key: https://nvd.nist.gov/developers/request-an-api-key -->
+					<plugin>
+						<groupId>org.owasp</groupId>
+						<artifactId>dependency-check-maven</artifactId>
+						<version>${dependency-check-maven.version}</version>
+						<configuration>
+							<failBuildOnCVSS>8</failBuildOnCVSS>
+						</configuration>
+						<executions>
+							<execution>
+								<id>dependency-check</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

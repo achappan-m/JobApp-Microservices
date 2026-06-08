@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+
+    <!--
+        SPRING_ENDPOINT (Low) — false positive.
+        FindSecBugs flags every @FeignClient interface method and every
+        @RequestMapping method on @RestController as an "exposed endpoint".
+        In this service, Feign client interfaces ARE the outbound call
+        contracts and controllers ARE the inbound REST endpoints — that is
+        their purpose. The finding adds no security signal here.
+    -->
+    <Match>
+        <Bug pattern="SPRING_ENDPOINT"/>
+        <Or>
+            <Class name="com.companyms.client.JobClient"/>
+            <Class name="com.companyms.client.ReviewClient"/>
+            <Class name="com.companyms.controller.CompanyController"/>
+        </Or>
+    </Match>
+
+    <!--
+        EI_EXPOSE_REP / EI_EXPOSE_REP2 (Medium) — accepted risk.
+        All flagged fields are either:
+          (a) Spring-managed singleton beans injected by the IoC container —
+              defensive copying of service references would break Spring's
+              proxy mechanism and is not the correct remedy here; or
+          (b) DTOs serialised directly to JSON over REST, where a defensive
+              copy of the List fields provides no security boundary.
+        The rule is correct in a general context; it is not actionable for
+        constructor-injected Spring beans or Jackson-serialised response
+        objects.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Package name="~com\.companyms\..*"/>
+    </Match>
+
+    <!--
+        THROWS_METHOD_THROWS_RUNTIMEEXCEPTION (Low) — intentional loud-failure
+        contract on the two delete fallback methods.
+        deleteJobFallback and deleteReviewFallback throw RuntimeException
+        deliberately: a delete that silently degrades would leave orphaned
+        data. The loud-failure behaviour is documented in the fallback contract
+        and is asserted by unit tests
+        (deleteJobFallback_throwsRuntimeException_loudFailureOnDeletes,
+         deleteReviewFallback_throwsRuntimeException_loudFailureOnDeletes).
+    -->
+    <Match>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+        <Or>
+            <Class name="com.companyms.service.impl.JobClientServiceImpl"/>
+            <Class name="com.companyms.service.impl.ReviewClientServiceImpl"/>
+        </Or>
+    </Match>
+
+    <!--
+        CRLF_INJECTION_LOGS (Low) — no live injection vector remains.
+        The first logged argument is companyId (Long), which cannot contain
+        CR or LF characters. The second argument was previously a raw
+        Throwable; it has been replaced with sanitize(throwable.getMessage()),
+        a private helper that strips '\r' and '\n' before the string reaches
+        the logger. FindSecBugs cannot statically prove the sanitise call but
+        the vector is closed.
+    -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Or>
+            <Class name="com.companyms.service.impl.JobClientServiceImpl"/>
+            <Class name="com.companyms.service.impl.ReviewClientServiceImpl"/>
+        </Or>
+    </Match>
+
+</FindBugsFilter>
